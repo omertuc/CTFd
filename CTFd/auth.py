@@ -15,6 +15,7 @@ from CTFd.utils.config import is_teams_mode
 from CTFd.utils.config.integrations import mlc_registration
 from CTFd.utils.config.visibility import registration_visible
 from CTFd.utils.crypto import verify_password
+from CTFd.utils.dates import ctf_started
 from CTFd.utils.decorators import ratelimit
 from CTFd.utils.decorators.visibility import check_registration_visibility
 from CTFd.utils.helpers import error_for, get_errors, markup
@@ -27,13 +28,20 @@ from CTFd.utils.validators import ValidationError
 auth = Blueprint("auth", __name__)
 
 
+def ready_redirect():
+    if ctf_started():
+        return redirect(url_for("challenges.listing"))
+
+    return redirect(url_for("views.static_html"))
+
+
 @auth.route("/confirm", methods=["POST", "GET"])
 @auth.route("/confirm/<data>", methods=["POST", "GET"])
 @ratelimit(method="POST", limit=10, interval=60)
 def confirm(data=None):
     if not get_config("verify_emails"):
         # If the CTF doesn't care about confirming email addresses then redierct to challenges
-        return redirect(url_for("challenges.listing"))
+        return ready_redirect()
 
     # User is confirming email account
     if data and request.method == "GET":
@@ -63,7 +71,7 @@ def confirm(data=None):
         email.successful_registration_notification(user.email)
         db.session.close()
         if current_user.authed():
-            return redirect(url_for("challenges.listing"))
+            return ready_redirect()
         return redirect(url_for("auth.login"))
 
     # User is trying to start or restart the confirmation flow
@@ -187,7 +195,7 @@ def reset_password(data=None):
 def register():
     errors = get_errors()
     if current_user.authed():
-        return redirect(url_for("challenges.listing"))
+        return ready_redirect()
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -355,7 +363,7 @@ def register():
         if is_teams_mode():
             return redirect(url_for("teams.private"))
 
-        return redirect(url_for("challenges.listing"))
+        return ready_redirect()
     else:
         return render_template("register.html", errors=errors)
 
@@ -392,7 +400,7 @@ def login():
                     request.args.get("next")
                 ):
                     return redirect(request.args.get("next"))
-                return redirect(url_for("challenges.listing"))
+                return ready_redirect()
 
             else:
                 # This user exists but the password is wrong
@@ -553,7 +561,7 @@ def oauth_redirect():
 
             login_user(user)
 
-            return redirect(url_for("challenges.listing"))
+            return ready_redirect()
         else:
             log("logins", "[{date}] {ip} - OAuth token retrieval failure")
             error_for(endpoint="auth.login", message="OAuth token retrieval failure.")

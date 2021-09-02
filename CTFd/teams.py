@@ -5,6 +5,7 @@ from CTFd.exceptions import TeamTokenExpiredException, TeamTokenInvalidException
 from CTFd.models import TeamFieldEntries, TeamFields, Teams, db
 from CTFd.utils import config, get_config, validators
 from CTFd.utils.crypto import verify_password
+from CTFd.utils.dates import ctf_started
 from CTFd.utils.decorators import authed_only, ratelimit, registered_only
 from CTFd.utils.decorators.modes import require_team_mode
 from CTFd.utils.decorators.visibility import (
@@ -16,6 +17,13 @@ from CTFd.utils.humanize.words import pluralize
 from CTFd.utils.user import get_current_user, get_current_user_attrs
 
 teams = Blueprint("teams", __name__)
+
+
+def ready_redirect():
+    if ctf_started():
+        return redirect(url_for("challenges.listing"))
+
+    return redirect(url_for("views.static_html"))
 
 
 @teams.route("/teams")
@@ -117,7 +125,7 @@ def invite():
         clear_user_session(user_id=user.id)
         clear_team_session(team_id=team.id)
 
-        return redirect(url_for("challenges.listing"))
+        return ready_redirect()
 
 
 @teams.route("/teams/join", methods=["GET", "POST"])
@@ -178,7 +186,7 @@ def join():
             clear_user_session(user_id=user.id)
             clear_team_session(team_id=team.id)
 
-            return redirect(url_for("challenges.listing"))
+            return ready_redirect()
         else:
             errors.append("That information is incorrect")
             return render_template("teams/join_team.html", infos=infos, errors=errors)
@@ -299,7 +307,7 @@ def new():
         clear_user_session(user_id=user.id)
         clear_team_session(team_id=team.id)
 
-        return redirect(url_for("challenges.listing"))
+        return ready_redirect()
 
 
 @teams.route("/team")
